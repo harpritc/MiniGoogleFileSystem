@@ -29,6 +29,7 @@ public class Client implements Serializable {
 	private static int serverId;
 	private static int port;
 	private static int mServerPort = 4043;
+	private static int NUMREPLICA = 2;
 	//private static String mServerAddr = "localhost";
 	public static String mServerAddr = "dc03.utdallas.edu";
 	private static TreeMap<Integer, Host> clientIdPortMap;
@@ -279,23 +280,24 @@ public class Client implements Serializable {
 				sendMessageAppendMserver("APPEND", fileName, byteCount);
 				System.out.println(" message send for append : waiting from m server");
 				Thread.sleep(1000);
-				
-				String input = null;
-				try {
-					 input = (String) isM_ob.readObject();
-					 System.out.println(input);
-				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				String[] parts = input.split(":");
-				// append file in server
-
-				// mserver:append:server id:filename
-				if (input.contains("APPEND")) {
-					Client.sendMessageAppendServer("APPEND",
-							Integer.parseInt(parts[2]), parts[3]);
+				for(int i=0;i<NUMREPLICA;i++){
+					String input = null;
+					try {
+						 input = (String) isM_ob.readObject();
+						 System.out.println(input);
+					} catch (ClassNotFoundException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					String[] parts = input.split(":");
+					// append file in server
+	
+					// mserver:append:server id:filename
+					if (input.contains("APPEND")) {
+						Client.sendMessageAppendServer("APPEND",
+								Integer.parseInt(parts[2]), parts[3]);
+					}
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();

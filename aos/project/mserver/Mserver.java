@@ -33,7 +33,8 @@ public class Mserver implements Serializable {
 	private static ServerSocket mServerListener = null;
 
 	private static int mServerPort = 4043;
-	public static int M = 3;
+	public static int M = 3; // servers
+	private static int NUMREPLICA = 2;
 	private static int serverId;
 	public static boolean flag_create_file = false;
 
@@ -171,29 +172,23 @@ public class Mserver implements Serializable {
 					serverIds_list.add(i);
 				}
 			}
-			int random_servId = serverIds_list.get(new Random()
-					.nextInt(serverIds_list.size()));
-			if(flagMap.get(random_servId) == false){		
-				try {
-					
-					osM_ob.writeObject("Mserver: Server down, Can not create file");
-					osM_ob.flush();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}else{
-				if(chId == 0){
-					chunkListMserver = new ArrayList<>();
-				}
-				System.out.println("sending message to server to create file");
-				// fileName, chId, sId,size
-				ChunkMeta ch = new ChunkMeta(fileName, chId, random_servId, 0);
-				//chunkListMserver = new ArrayList<>();
-				chunkListMserver.add(ch);
-				fileNameMeta.put(fileName, chunkListMserver);
-				// new Thread(new MserverListener()).start();
-				sendMessageCreate(fileName, random_servId, chId);
+			
+			Collections.shuffle(serverIds_list);
+		 
+		    List<Integer> randomServerIds = serverIds_list.subList(0, NUMREPLICA);
+			
+			if(chId == 0){
+				chunkListMserver = new ArrayList<>();
 			}
+			System.out.println("sending message to server to create file");
+			// fileName, chId, sId,size
+			ChunkMeta ch = new ChunkMeta(fileName, chId, randomServerIds, 0);
+			//chunkListMserver = new ArrayList<>();
+			chunkListMserver.add(ch);
+			fileNameMeta.put(fileName, chunkListMserver);
+			// new Thread(new MserverListener()).start();
+			sendMessageCreate(fileName, randomServerIds, chId);
+			
 			
 		}
 
@@ -209,7 +204,7 @@ public class Mserver implements Serializable {
 			temp_arList = fileNameMeta.get(fileName);
 			int servId=0;
 			try{
-				servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sId;
+				servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(0);
 			}catch(NullPointerException n){
 				n.printStackTrace();
 			}
@@ -240,12 +235,17 @@ public class Mserver implements Serializable {
 					}
 					temp_arList = fileNameMeta.get(fileName);
 				}
-				servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sId;
+				
 				fileNameMeta.get(fileName).get(temp_arList.size() - 1).size += byteCount;
-				System.out
-						.println("sending message to client with meta info to append file");
-				// new Thread(new Mserver()).start();
-				sendMessageAppendClient(fileName, servId, osM_ob);
+				for(int i=0;i<NUMREPLICA;i++){
+					servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(i);
+					
+					System.out
+							.println("sending message to client with meta info to append file");
+					// new Thread(new Mserver()).start();
+					sendMessageAppendClient(fileName, servId, osM_ob);
+				}
+				
 
 			}
 		}
@@ -276,7 +276,7 @@ public class Mserver implements Serializable {
 
 			int sB = startByte % CHUNKSIZE;
 			int chunkNum = startByte / CHUNKSIZE;
-			int servId = fileNameMeta.get(fileName).get(chunkNum).sId;
+			int servId = fileNameMeta.get(fileName).get(chunkNum).sIdList.get(0);
 			if(flagMap.get(servId) == false){		
 				try {
 					
@@ -297,7 +297,7 @@ public class Mserver implements Serializable {
 					}
 					int bytesSecondChunk = byteCount - bytesFirstChunk;
 					System.out.println("fileNameMeta " + fileNameMeta);
-					int serverId = fileNameMeta.get(fileName).get(chunkNum+1).sId;
+					int serverId = fileNameMeta.get(fileName).get(chunkNum+1).sIdList.get(0);
 					int chIdd = fileNameMeta.get(fileName).get(chunkNum+1).chId;
 					sendMessageReadClient(fileName, serverId, 1, bytesSecondChunk, chIdd,
 							osM_ob);
@@ -341,17 +341,25 @@ public class Mserver implements Serializable {
 			System.out.println("message sent to server to read to first chunk file");
 		}
 	// to server
-	private static void sendMessageCreate(String fileName, int serverId,
+	private static void sendMessageCreate(String fileName, List<Integer> serverIdList,
 			int chId) {
-
-		try {
-			mServerOutStream.get(serverId).writeObject(
-					"Mserver:CREATE:" + serverId + ":" + fileName + ":" + chId);
-			mServerOutStream.get(serverId).flush();
-		} catch (IOException e) {
-			e.printStackTrace();
+		StringBuilder sb = new StringBuilder();
+		for(int i=0;i<serverIdList.size();i++){
+			sb.append(serverIdList.get(i));
+			sb.append(",");
 		}
-		System.out.println("message sent to server to create file");
+		
+		for(int i=0;i<serverIdList.size();i++){
+			try {
+				mServerOutStream.get(serverIdList.get(i)).writeObject(
+						"Mserver:CREATE:" + sb.toString() + ":" + fileName + ":" + chId);
+				mServerOutStream.get(serverIdList.get(i)).flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			System.out.println("message sent to server to create file");
+		}
+		
 	}
 
 	// meta's info to client

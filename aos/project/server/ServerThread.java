@@ -14,6 +14,7 @@ import java.io.Serializable;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -91,7 +92,7 @@ public class ServerThread implements Runnable, Serializable {
 					System.out.println("input to Server " + input);
 
 					String[] parts = input.split(":");
-							// "Mserver:CREATE:" + serverId+ fileName + chId
+							// "Mserver:CREATE:" + serverIdlist+ fileName + chId
 					if (input.contains("CREATE")) {
 						if ((Server.serverMeta.containsKey(parts[3]))
 								&& Integer.parseInt(parts[4]) == 0) {
@@ -109,13 +110,19 @@ public class ServerThread implements Runnable, Serializable {
 								 chunkListServer = new ArrayList<>();
 							 }
 						
-
+							 List<String> serverList = new ArrayList<String>(Arrays.asList(
+									 parts[2].split(",")));
+							 List<Integer> serverIdList = new ArrayList<>();
+							 for(String s:serverList ){
+								 serverIdList.add(Integer.valueOf(s));
+							 }
 							// chunkListServer =
 							// Server.serverMeta.get(parts[3]);
 							// ChunkMeta : filename,chId,serverId,size
 							System.out.println("server_meta BEFORE " + Server.serverMeta);
+							
 							chunkListServer.add(new ChunkMeta(parts[3], Integer
-									.parseInt(parts[4]), Server.serverId, 0));
+									.parseInt(parts[4]), serverIdList, 0));
 							Server.serverMeta.put(parts[3], chunkListServer);
 							System.out.println("server_meta " + Server.serverMeta);
 							/*File file_1 = new File(
@@ -135,7 +142,7 @@ public class ServerThread implements Runnable, Serializable {
 							}
 							File file_1 = new File(
 									"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
-											+ parts[2]
+											+ Server.serverId
 											+ "/"
 											+ chunkName);
 							
