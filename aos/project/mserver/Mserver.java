@@ -115,7 +115,7 @@ public class Mserver implements Serializable {
 			*/
 			//linux
 			scanner_server = new Scanner(
-					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS/config/server_config_linux.txt"));
+					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS_2/config/server_config_linux.txt"));
 			for (int i = 0; i < M; i++) {
 				String line = scanner_server.nextLine().trim();
 				String[] parts = line.split("\\s+");
@@ -165,17 +165,16 @@ public class Mserver implements Serializable {
 
 		if (mSocketS != null & m_isS_ob != null && m_osS_ob != null) {
 			
+			List<Integer> tempSIDList = new ArrayList<>(serverIds_list);
 			for(int i=0;i<flagMap.size();i++){
 				if(flagMap.get(i) == false){
-					serverIds_list.remove(new Integer(i));
-				}else if(!serverIds_list.contains(i)){
-					serverIds_list.add(i);
+					tempSIDList.remove(new Integer(i));
 				}
 			}
 			
-			Collections.shuffle(serverIds_list);
+			Collections.shuffle(tempSIDList);
 		 
-		    List<Integer> randomServerIds = serverIds_list.subList(0, NUMREPLICA);
+		    List<Integer> randomServerIds = tempSIDList.subList(0, NUMREPLICA);
 			
 			if(chId == 0){
 				chunkListMserver = new ArrayList<>();
@@ -196,32 +195,20 @@ public class Mserver implements Serializable {
 
 	// Append
 
-	public static void appendFile(String fileName, int byteCount,
+	public static synchronized void appendFile(String fileName, int byteCount,
 			ObjectOutputStream osM_ob) {
 
 		if (mSocketS != null & m_isS_ob != null && m_osS_ob != null) {
 			temp_arList = new ArrayList<>();
 			temp_arList = fileNameMeta.get(fileName);
 			int servId=0;
-			try{
-				servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(0);
-			}catch(NullPointerException n){
-				n.printStackTrace();
-			}
-			if(flagMap.get(servId) == false){		
-				try {
-					System.out.println("sendind down message to client");
-					osM_ob.writeObject("Mserver: Server down, Can not append file");
-					osM_ob.flush();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}else{
-				
-				int S = fileNameMeta.get(fileName).get(temp_arList.size() - 1).size
-						+ byteCount;
-				System.out.println("........s........." + S);
-				if (S > CHUNKSIZE) {
+					
+			int S = fileNameMeta.get(fileName).get(temp_arList.size() - 1).size
+					+ byteCount;
+			System.out.println("........s........." + S);
+			if (S > CHUNKSIZE) {
+				for(int i=0;i<NUMREPLICA;i++){
+					servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(i);
 					System.out.println("........Adding null to file........." + S);
 					sendMessageAppendNull(fileName, servId);
 					System.out.println("........creating new chunk........." + S);
@@ -233,24 +220,29 @@ public class Mserver implements Serializable {
 					} catch (InterruptedException e1) {
 						e1.printStackTrace();
 					}
-					temp_arList = fileNameMeta.get(fileName);
 				}
-				
-				fileNameMeta.get(fileName).get(temp_arList.size() - 1).size += byteCount;
-				for(int i=0;i<NUMREPLICA;i++){
-					if(flagMap.get(i) == true){
-						servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(i);
-						
-						System.out
-								.println("sending message to client with meta info to append file");
-						// new Thread(new Mserver()).start();
-						sendMessageAppendClient(fileName, servId, osM_ob);
-					}
-					
-				}
-				
-
+				temp_arList = fileNameMeta.get(fileName);
 			}
+			
+			fileNameMeta.get(fileName).get(temp_arList.size() - 1).size += byteCount;
+			String downOrUp = "up";
+			for(int sid : fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList){
+				if(flagMap.get(sid) == false){
+					downOrUp = "down";
+				}
+			}
+			for(int sid : fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList){
+				if(flagMap.get(sid) == true){
+					//servId = fileNameMeta.get(fileName).get(temp_arList.size() - 1).sIdList.get(i);
+					
+					System.out
+							.println("sending message to client with meta info to append file");
+					// new Thread(new Mserver()).start();
+					sendMessageAppendClient(fileName, sid, osM_ob,downOrUp);
+				}
+				
+			}
+					
 		}
 			
 
@@ -290,41 +282,33 @@ public class Mserver implements Serializable {
 					tempSIdList.add(i);
 				}
 			}
-			int random_servId = serverIds_list.get(new Random().nextInt(serverIds_list.size()));
+			int random_servId = tempSIdList.get(new Random().nextInt(tempSIdList.size()));
 			//int servId = fileNameMeta.get(fileName).get(chunkNum).sIdList.get(0);
-			if(flagMap.get(random_servId) == false){		
+			
+			if(sB + byteCount > CHUNKSIZE){
+				int bytesFirstChunk = CHUNKSIZE - sB;
+				sendMessageReadFirstChunkClient(fileName, random_servId, sB, bytesFirstChunk, chunkNum,
+				osM_ob);
 				try {
-					
-					osM_ob.writeObject("Mserver: Server down, Can not read file");
-					osM_ob.flush();
-				} catch (IOException e) {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
+				int bytesSecondChunk = byteCount - bytesFirstChunk;
+				System.out.println("fileNameMeta " + fileNameMeta);
+				int serverId = fileNameMeta.get(fileName).get(chunkNum+1).sIdList.get(0);
+				int chIdd = fileNameMeta.get(fileName).get(chunkNum+1).chId;
+				sendMessageReadClient(fileName, serverId, 1, bytesSecondChunk, chIdd,
+						osM_ob);
+				
 			}else{
-				if(sB + byteCount > CHUNKSIZE){
-					int bytesFirstChunk = CHUNKSIZE - sB;
-					sendMessageReadFirstChunkClient(fileName, random_servId, sB, bytesFirstChunk, chunkNum,
-					osM_ob);
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					int bytesSecondChunk = byteCount - bytesFirstChunk;
-					System.out.println("fileNameMeta " + fileNameMeta);
-					int serverId = fileNameMeta.get(fileName).get(chunkNum+1).sIdList.get(0);
-					int chIdd = fileNameMeta.get(fileName).get(chunkNum+1).chId;
-					sendMessageReadClient(fileName, serverId, 1, bytesSecondChunk, chIdd,
-							osM_ob);
-					
-				}else{
-					System.out
-					.println("sending message to client with meta info to read file");
-					// new Thread(new Mserver()).start();
-					sendMessageReadClient(fileName, random_servId, sB, byteCount, chunkNum,
-							osM_ob);
-				}
+				System.out
+				.println("sending message to client with meta info to read file");
+				// new Thread(new Mserver()).start();
+				sendMessageReadClient(fileName, random_servId, sB, byteCount, chunkNum,
+						osM_ob);
 			}
+			
 			
 		}
 
@@ -379,10 +363,10 @@ public class Mserver implements Serializable {
 
 	// meta's info to client
 	private static void sendMessageAppendClient(String fileName, int serverId,
-			ObjectOutputStream osM) {
+			ObjectOutputStream osM,String flag) {
 
 		try {
-			osM.writeObject("Mserver:APPEND:" + serverId + ":" + fileName);
+			osM.writeObject("Mserver:APPEND:" + serverId + ":" + fileName + ":" + flag);
 			osM.flush();
 		} catch (IOException e) {
 			e.printStackTrace();

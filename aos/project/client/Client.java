@@ -120,16 +120,16 @@ public class Client implements Serializable {
 			/*
 			scanner_client = new Scanner(
 					new File(
-							"C:\\Users\\harpritc\\workspace\\DFS\\config\\client_config.txt"));
+							"C:\\Users\\harpritc\\workspace\\DFS_2\\config\\client_config.txt"));
 			scanner_server = new Scanner(
 					new File(
-							"C:\\Users\\harpritc\\workspace\\DFS\\config\\server_config.txt"));
+							"C:\\Users\\harpritc\\workspace\\DFS_2\\config\\server_config.txt"));
 			*/
 			//linux
 			scanner_client = new Scanner(
-					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS/config/client_config_linux.txt"));
+					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS_2/config/client_config_linux.txt"));
 			scanner_server = new Scanner(
-					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS/config/server_config_linux.txt"));
+					new File( "/home/012/h/hs/hsc160030/AOS_2/DFS_2/config/server_config_linux.txt"));
 		} catch (FileNotFoundException e) {
 			System.out.println("file not found");
 			e.printStackTrace();
@@ -280,7 +280,8 @@ public class Client implements Serializable {
 				sendMessageAppendMserver("APPEND", fileName, byteCount);
 				System.out.println(" message send for append : waiting from m server");
 				Thread.sleep(1000);
-				for(int i=0;i<NUMREPLICA;i++){
+				int numReplica = NUMREPLICA;
+				for(int i=0;i<numReplica;i++){
 					String input = null;
 					try {
 						 input = (String) isM_ob.readObject();
@@ -292,8 +293,11 @@ public class Client implements Serializable {
 					}
 					String[] parts = input.split(":");
 					// append file in server
-	
-					// mserver:append:server id:filename
+					if (parts[4].equals("down")) {
+						System.out.println("down from m server");
+						i++;
+					}
+					// mserver:append:server id:filename:flag
 					if (input.contains("APPEND")) {
 						Client.sendMessageAppendServer("APPEND",
 								Integer.parseInt(parts[2]), parts[3]);
@@ -318,11 +322,9 @@ public class Client implements Serializable {
 				try {
 					 input = (String) isM_ob.readObject();
 					 System.out.println(input);
-				} catch (ClassNotFoundException e) {
+				} catch (ClassNotFoundException  | IOException e ) {
 					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				} 
 				String[] parts = input.split(":");
 				// mserver:read:server id:
 				// startyByte:byteCount:chunkNum:filename

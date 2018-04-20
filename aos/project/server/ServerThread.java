@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Scanner;
 
 import aos.project.common.ChunkMeta;
 
@@ -28,8 +29,8 @@ public class ServerThread implements Runnable, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private Socket sConnection = null;
-	private ObjectInputStream isS_ob = null;
-	private ObjectOutputStream osS_ob = null;
+	public static ObjectInputStream isS_ob = null;
+	public static ObjectOutputStream osS_ob = null;
 
 	private final static int CHUNKSIZE = 8192;
 	private List<ChunkMeta> tempArrListAppend;
@@ -92,7 +93,13 @@ public class ServerThread implements Runnable, Serializable {
 					System.out.println("input to Server " + input);
 
 					String[] parts = input.split(":");
+					
+					if (input.contains("Server 3 is conecting ")) {
+						osS_ob.writeObject(" From Server 0 and 1 : server is talking");
+						osS_ob.flush();
+					}
 							// "Mserver:CREATE:" + serverIdlist+ fileName + chId
+					
 					if (input.contains("CREATE")) {
 						if ((Server.serverMeta.containsKey(parts[3]))
 								&& Integer.parseInt(parts[4]) == 0) {
@@ -126,7 +133,7 @@ public class ServerThread implements Runnable, Serializable {
 							Server.serverMeta.put(parts[3], chunkListServer);
 							System.out.println("server_meta " + Server.serverMeta);
 							/*File file_1 = new File(
-									"C:\\Users\\harpritc\\workspace\\DFS\\Server_"
+									"C:\\Users\\harpritc\\workspace\\DFS_2\\Server_"
 											+ parts[2]
 											+ "\\"
 											+ Server.serverMeta
@@ -141,7 +148,7 @@ public class ServerThread implements Runnable, Serializable {
 								}
 							}
 							File file_1 = new File(
-									"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
+									"/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
 											+ Server.serverId
 											+ "/"
 											+ chunkName);
@@ -153,8 +160,8 @@ public class ServerThread implements Runnable, Serializable {
 							}
 							//osS_ob.writeObject(" From Server: Created file in Server Id " + Server.serverId);
 							//osS_ob.flush();
+						 }
 					}
-				}
 					
 					//Mserver:PADNULL:" + serverId + ":" + fileName
 					if(input.contains("PADNULL")){
@@ -171,13 +178,13 @@ public class ServerThread implements Runnable, Serializable {
 									tempArrListAppend.size() - 1).chunkName;
 							System.out.println(	"chunkName " + chunkName);
 							FileWriter fw = new FileWriter(
-									"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
+									"/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
 											+ parts[2] + "/"
 											+ chunkName, true);
 							
 							
 							/*FileWriter fw = new FileWriter(
-									"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
+									"/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
 											+ parts[2] + "/"
 											+ chunkName, true);*/
 							BufferedWriter bw = new BufferedWriter(fw);
@@ -212,12 +219,12 @@ public class ServerThread implements Runnable, Serializable {
 										tempArrListAppend.size() - 1).chunkName;
 								/*
 								FileWriter fw = new FileWriter(
-										"C:\\Users\\harpritc\\workspace\\DFS\\Server_"
+										"C:\\Users\\harpritc\\workspace\\DFS_2\\Server_"
 												+ parts[1] + "\\" + chunkName,
 										true);
 								*/
 								FileWriter fw = new FileWriter(
-										"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
+										"/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
 												+ parts[1] + "/" + chunkName,
 										true);
 								
@@ -259,12 +266,12 @@ public class ServerThread implements Runnable, Serializable {
 								
 								/*
 								RandomAccessFile raf = new RandomAccessFile(
-										"C:\\Users\\harpritc\\workspace\\DFS\\Server_"
+										"C:\\Users\\harpritc\\workspace\\DFS_2\\Server_"
 												+ parts[1] + "\\" + chunkName,
 										"rw");
 								*/
 								RandomAccessFile raf = new RandomAccessFile(
-										"/home/012/h/hs/hsc160030/AOS_2/DFS/Server_"
+										"/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
 												+ parts[1] + "/" + chunkName,
 										"rw");
 								raf.seek(Integer.parseInt(parts[4]) - 1);
@@ -281,8 +288,48 @@ public class ServerThread implements Runnable, Serializable {
 							}
 
 						}
+					}//read
+					
+					// clientId + ":" + serverId + ":" + command + ":" +
+					// fileName + ":" + startByte + ":" + byteCount + ":" +
+					// chunkNum
+					//"COPY:" + fileName + ":" + randSid + ":" + chId
+					if (input.contains("COPY")) {
+						if (!(Server.serverMeta.containsKey(parts[1]))) {
+							System.out
+									.println("File does not exist, Need to create file. Can not read");
+							osS_ob.writeObject(" From Server: File does not exist, Need to create file. Can not read");
+							osS_ob.flush();
+						} else {
+							try {
+								
+								String chunkName = "";
+								for(int i=0;i<Server.serverMeta.get(parts[1]).size();i++){
+										if(Integer.parseInt(parts[3]) == Server.serverMeta.get(parts[1]).get(i).chId){
+											chunkName = Server.serverMeta.get(
+												parts[1]).get(i).chunkName;
+										}
+								}
+								String chunkPath = "/home/012/h/hs/hsc160030/AOS_2/DFS_2/Server_"
+										+ parts[2] + "/" + chunkName;
+								Scanner scanner_entireFile = new Scanner(new File(chunkPath));
+								String entireFile = scanner_entireFile.useDelimiter("\\A").next();
+								
+								System.out.println("copy: reading from server " + entireFile);
+								System.out
+										.println("copy : sending message to client read");
+								osS_ob.writeObject(entireFile);
+								osS_ob.flush();
+								System.out.println("copy : sending  done");
+								scanner_entireFile.close();
+								
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+
+						}
 					}
-				}
+				} // if flag
 
 			} catch (SocketException e) {
 				e.printStackTrace();
